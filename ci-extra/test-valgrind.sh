@@ -13,4 +13,5 @@ valgrind --tool=memcheck \
   --vgdb=no \
   --error-exitcode=1 \
   --suppressions="${SCRIPT_DIR}/valgrind.suppressions" \
+  --soname-synonyms=somalloc=nouserintercepts \
   cmake-build-RelWithDebInfo/tests
