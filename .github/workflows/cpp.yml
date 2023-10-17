@@ -1,0 +1,85 @@
+name: C++ CI
+
+on:
+  pull_request
+
+jobs:
+  formatting-check:
+    name: Formatting check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Check line breaks
+        run: |
+          sudo apt-get install -y dos2unix
+          pushd $GITHUB_WORKSPACE
+          ci-extra/check-lines.sh
+          popd
+      - name: Run clang-format style check
+        # TODO format using clang container
+        uses: jidicula/clang-format-action@v4.11.0
+        with:
+          clang-format-version: '16'
+          check-path: '.'
+
+  test:
+    needs: formatting-check
+    name: Tests in ${{ matrix.build_type }} with ${{ matrix.compiler }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Release, Debug, SanitizedDebug, RelWithDebInfo]
+        compiler: ['gcc:13', 'clang:16']
+
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/cpp-kt/${{ matrix.compiler }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Update tests
+        run: |
+          chown root:root .
+          git config --global user.name "John Doe"
+          git config --global user.email johndoe@example.com
+          source ci-extra/set-upstream.sh
+          git remote add upstream "https://github.com/$UPSTREAM_REPO.git"
+          git fetch upstream master
+          if git merge-base --is-ancestor upstream/master @; then
+            echo 'Tests are already up to date.'
+            echo 'TESTS_UPDATED=0' >> $GITHUB_ENV
+          else
+            echo 'Updating tests...'
+            git rebase upstream/master
+            echo 'Tests updated.'
+            echo 'TESTS_UPDATED=1' >> $GITHUB_ENV
+          fi
+
+      - name: Build main
+        run: ci-extra/build.sh ${{ matrix.build_type }}
+
+      - name: Test main
+        run: |
+          if [[ ${{ env.TESTS_UPDATED }} -eq 1 ]]; then
+            echo -ne '\e[0;33mWARNING: Tests were not updated on your side. '
+            echo -e 'This script will however run the most recent version.\e[0m'
+          fi
+          if [[ ${{ matrix.build_type }} == "SanitizedDebug" ]]; then
+            ASAN_OPTIONS=alloc_dealloc_mismatch=0 ci-extra/test.sh ${{ matrix.build_type }}
+          else
+            ci-extra/test.sh ${{ matrix.build_type }}
+          fi
+
+      - if: ${{ matrix.build_type == 'RelWithDebInfo' }}
+        name: Test main with valgrind
+        run: ci-extra/test-valgrind.sh
