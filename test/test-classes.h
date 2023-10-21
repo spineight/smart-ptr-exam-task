@@ -2,6 +2,16 @@
 
 #include "test-object.h"
 
+struct non_copyable_tacker {
+public:
+  non_copyable_tacker() = default;
+  non_copyable_tacker(const non_copyable_tacker&) = delete;
+
+  void operator()(test_object* obj) {
+    delete obj;
+  }
+};
+
 template <typename T>
 struct tracking_deleter {
   tracking_deleter() = default;

@@ -153,6 +153,10 @@ TYPED_TEST(common_tests, copy_assignment_operator_self_nullptr) {
   EXPECT_FALSE(static_cast<bool>(p));
 }
 
+TYPED_TEST(common_tests, non_copyable_deleter) {
+  typename TestFixture::template smart_ptr<test_object, non_copyable_tacker> p(new test_object(42));
+}
+
 TYPED_TEST(common_tests, ptr_ctor_inheritance) {
   bool deleted = false;
   { typename TestFixture::template smart_ptr<destruction_tracker_base> p(new destruction_tracker(&deleted)); }
