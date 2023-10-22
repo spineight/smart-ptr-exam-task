@@ -5,6 +5,9 @@
 #include <gtest/gtest.h>
 
 namespace {
+
+using destruction_tracker_base_deleter = std::default_delete<destruction_tracker_base>;
+
 template <typename IsShared>
 class common_tests : public ::testing::Test {
 protected:
@@ -27,16 +30,8 @@ public:
   }
 };
 
-class unifiedDestructorForBase {
-public:
-  unifiedDestructorForBase() = default;
-
-  void operator()(destruction_tracker_base* val) {
-    delete val;
-  }
-};
-
 TYPED_TEST_SUITE(common_tests, tested_extents, extent_name_generator);
+
 } // namespace
 
 TYPED_TEST(common_tests, default_ctor) {
@@ -160,7 +155,7 @@ TYPED_TEST(common_tests, non_copyable_deleter) {
 TYPED_TEST(common_tests, ptr_ctor_inheritance) {
   bool deleted = false;
   { typename TestFixture::template smart_ptr<destruction_tracker_base> p(new destruction_tracker(&deleted)); }
-  EXPECT_TRUE(deleted); // cause no polymorphism so we use dstr from base
+  EXPECT_TRUE(deleted);
 }
 
 TYPED_TEST(common_tests, reset_ptr_inheritance) {
@@ -190,13 +185,13 @@ TYPED_TEST(common_tests, custom_deleter_reset) {
   EXPECT_TRUE(deleted);
 }
 
-TEST(linked_tests, copy_ctor_const) {
+TEST(linked_ptr_tests, copy_ctor_const) {
   linked_ptr<test_object, std::default_delete<const test_object>> p(new test_object(42));
   linked_ptr<const test_object> q = p;
   EXPECT_EQ(42, *q);
 }
 
-TEST(linked_tests, copy_assignment_operator_const) {
+TEST(linked_ptr_tests, copy_assignment_operator_const) {
   linked_ptr<test_object, std::default_delete<const test_object>> p(new test_object(42));
   linked_ptr<const test_object> q(new test_object(43));
   q = p;
@@ -204,7 +199,7 @@ TEST(linked_tests, copy_assignment_operator_const) {
   EXPECT_EQ(42, *p);
 }
 
-TEST(linked_tests, copy_assignment_operator_const_to_nullptr) {
+TEST(linked_ptr_tests, copy_assignment_operator_const_to_nullptr) {
   linked_ptr<test_object, std::default_delete<const test_object>> p(new test_object(42));
   linked_ptr<const test_object> q;
   q = p;
@@ -212,7 +207,7 @@ TEST(linked_tests, copy_assignment_operator_const_to_nullptr) {
   EXPECT_EQ(42, *p);
 }
 
-TEST(linked_tests, copy_assignment_operator_const_from_nullptr) {
+TEST(linked_ptr_tests, copy_assignment_operator_const_from_nullptr) {
   linked_ptr<test_object, std::default_delete<const test_object>> p;
   linked_ptr<const test_object> q(new test_object(43));
   q = p;
@@ -220,39 +215,40 @@ TEST(linked_tests, copy_assignment_operator_const_from_nullptr) {
   EXPECT_FALSE(static_cast<bool>(p));
 }
 
-TEST(linked_tests, copy_ctor_inheritance) {
+TEST(linked_ptr_tests, copy_ctor_inheritance) {
   bool deleted = false;
   {
     destruction_tracker* ptr = new destruction_tracker(&deleted);
-    linked_ptr<destruction_tracker, unifiedDestructorForBase> d(ptr);
+    linked_ptr<destruction_tracker, destruction_tracker_base_deleter> d(ptr);
     {
-      linked_ptr<destruction_tracker_base, unifiedDestructorForBase> b = d;
+      linked_ptr<destruction_tracker_base, destruction_tracker_base_deleter> b = d;
       EXPECT_EQ(ptr, b.get());
       EXPECT_EQ(ptr, d.get());
     }
     EXPECT_FALSE(deleted);
   }
-  EXPECT_TRUE(deleted); // same reason
+  EXPECT_TRUE(deleted);
 }
 
-TEST(linked_tests, copy_assignment_operator_inheritance) {
-  bool deleted = false;
+TEST(linked_ptr_tests, copy_assignment_operator_inheritance) {
+  bool derived_deleted = false;
   {
-    destruction_tracker* ptr = new destruction_tracker(&deleted);
-    linked_ptr<destruction_tracker, unifiedDestructorForBase> d(ptr);
-    bool tmpDeleted = false;
+    destruction_tracker* ptr = new destruction_tracker(&derived_deleted);
+    linked_ptr<destruction_tracker, destruction_tracker_base_deleter> d(ptr);
+    bool base_deleted = false;
     {
-      linked_ptr<destruction_tracker_base, unifiedDestructorForBase> b(new destruction_tracker_base(&tmpDeleted));
+      linked_ptr<destruction_tracker_base, destruction_tracker_base_deleter> b(
+          new destruction_tracker_base(&base_deleted));
       b = d;
       EXPECT_EQ(ptr, b.get());
       EXPECT_EQ(ptr, d.get());
-      EXPECT_FALSE(deleted);
-      EXPECT_TRUE(tmpDeleted);
+      EXPECT_FALSE(derived_deleted);
+      EXPECT_TRUE(base_deleted);
     }
-    EXPECT_FALSE(deleted);
-    EXPECT_TRUE(tmpDeleted);
+    EXPECT_FALSE(derived_deleted);
+    EXPECT_TRUE(base_deleted);
   }
-  EXPECT_TRUE(deleted); // same reason
+  EXPECT_TRUE(derived_deleted);
 }
 
 TYPED_TEST(common_tests, equivalence) {
@@ -301,84 +297,72 @@ TYPED_TEST(common_tests, check_lifetime) {
   EXPECT_TRUE(deleted);
 }
 
-TEST(type_test, shared_prt_cstr) {
+TEST(trait_tests, shared_prt_ctors) {
   static_assert(std::is_constructible_v<shared_ptr<int>, int*>);
   static_assert(std::is_constructible_v<shared_ptr<int>, int*, std::default_delete<int>>);
-  static_assert(!std::is_constructible_v<shared_ptr<int>, int*, std::default_delete<char>>);
+  static_assert(!std::is_constructible_v<shared_ptr<int>, double*, std::default_delete<double>>);
+  static_assert(!std::is_constructible_v<shared_ptr<int>, int*, std::default_delete<double>>);
+  static_assert(!std::is_constructible_v<shared_ptr<int>, double*, std::default_delete<int>>);
+
+  static_assert(!std::is_constructible_v<shared_ptr<destruction_tracker>, destruction_tracker_base*>);
   static_assert(std::is_constructible_v<shared_ptr<destruction_tracker_base>, destruction_tracker*>);
-  static_assert(
-      std::is_constructible_v<shared_ptr<destruction_tracker_base, std::default_delete<destruction_tracker_base>>,
-                              destruction_tracker*, std::default_delete<destruction_tracker>>);
+  static_assert(std::is_constructible_v<shared_ptr<destruction_tracker_base>, destruction_tracker*,
+                                        std::default_delete<destruction_tracker>>);
 }
 
-TEST(type_test, linked_prt_cstr) {
+TEST(trait_tests, linked_prt_ctors) {
   static_assert(std::is_constructible_v<linked_ptr<int>, int*>);
   static_assert(std::is_constructible_v<linked_ptr<int>, int*, std::default_delete<int>>);
-  static_assert(!std::is_constructible_v<linked_ptr<int>, int*, std::default_delete<char>>);
+  static_assert(!std::is_constructible_v<linked_ptr<int>, double*, std::default_delete<double>>);
+  static_assert(!std::is_constructible_v<linked_ptr<int>, int*, std::default_delete<double>>);
+  static_assert(!std::is_constructible_v<linked_ptr<int>, double*, std::default_delete<int>>);
+
+  static_assert(!std::is_constructible_v<linked_ptr<destruction_tracker>, destruction_tracker_base*>);
   static_assert(std::is_constructible_v<linked_ptr<destruction_tracker_base>, destruction_tracker*>);
-  static_assert(
-      std::is_constructible_v<linked_ptr<destruction_tracker_base, std::default_delete<destruction_tracker_base>>,
-                              destruction_tracker*, std::default_delete<destruction_tracker>>);
+  static_assert(std::is_constructible_v<linked_ptr<destruction_tracker_base>, destruction_tracker*,
+                                        std::default_delete<destruction_tracker>>);
 }
 
-TEST(type_test, shared_ptr_copy) {
-  static_assert(std::is_constructible_v<shared_ptr<int>, shared_ptr<int>>);
-  static_assert(std::is_constructible_v<shared_ptr<int>, shared_ptr<int, std::default_delete<int>>>);
-  static_assert(
-      std::is_constructible_v<shared_ptr<int, std::default_delete<int>>, shared_ptr<int, std::default_delete<int>>>);
-  static_assert(!std::is_constructible_v<shared_ptr<int>, shared_ptr<char>>);
-  static_assert(!std::is_constructible_v<shared_ptr<char>, shared_ptr<int>>);
-  // don't look at incorrect dstr for int. Just need type checking
-  static_assert(!std::is_constructible_v<shared_ptr<char, std::default_delete<char>>,
-                                         shared_ptr<int, std::default_delete<char>>>);
+TEST(trait_tests, shared_ptr_copy_ctor) {
+  static_assert(!std::is_constructible_v<shared_ptr<const int>, shared_ptr<int>>);
+  static_assert(!std::is_constructible_v<shared_ptr<int>, shared_ptr<const int>>);
+  static_assert(!std::is_constructible_v<shared_ptr<int>, shared_ptr<double>>);
+
+  static_assert(!std::is_constructible_v<shared_ptr<destruction_tracker>, shared_ptr<destruction_tracker_base>>);
   static_assert(!std::is_constructible_v<shared_ptr<destruction_tracker_base>, shared_ptr<destruction_tracker>>);
-  static_assert(!std::is_constructible_v<shared_ptr<destruction_tracker_base, unifiedDestructorForBase>,
-                                         shared_ptr<destruction_tracker, unifiedDestructorForBase>>);
+  static_assert(!std::is_constructible_v<shared_ptr<destruction_tracker_base>,
+                                         shared_ptr<destruction_tracker, destruction_tracker_base_deleter>>);
 }
 
-TEST(type_test, linked_ptr_copy) {
-  static_assert(std::is_constructible_v<linked_ptr<int>, linked_ptr<int>>);
-  static_assert(std::is_constructible_v<linked_ptr<int>, linked_ptr<int, std::default_delete<int>>>);
-  static_assert(
-      std::is_constructible_v<linked_ptr<int, std::default_delete<int>>, linked_ptr<int, std::default_delete<int>>>);
-  static_assert(!std::is_constructible_v<linked_ptr<int>, linked_ptr<char>>);
-  static_assert(!std::is_constructible_v<linked_ptr<char>, linked_ptr<int>>);
-  // don't look at incorrect dstr for int. Just need type checking
-  static_assert(
-      std::is_constructible_v<linked_ptr<char, std::default_delete<char>>, linked_ptr<int, std::default_delete<char>>>);
-  static_assert(std::is_constructible_v<linked_ptr<destruction_tracker_base>, linked_ptr<destruction_tracker>>);
+TEST(trait_tests, linked_ptr_copy_ctor) {
+  static_assert(std::is_constructible_v<linked_ptr<const int>, linked_ptr<int>>);
+  static_assert(!std::is_constructible_v<linked_ptr<int>, linked_ptr<const int>>);
+  static_assert(!std::is_constructible_v<linked_ptr<int>, linked_ptr<double>>);
+
   static_assert(!std::is_constructible_v<linked_ptr<destruction_tracker>, linked_ptr<destruction_tracker_base>>);
-  static_assert(std::is_constructible_v<linked_ptr<destruction_tracker_base, unifiedDestructorForBase>,
-                                        linked_ptr<destruction_tracker, unifiedDestructorForBase>>);
+  static_assert(std::is_constructible_v<linked_ptr<destruction_tracker_base>, linked_ptr<destruction_tracker>>);
+  static_assert(std::is_constructible_v<linked_ptr<destruction_tracker_base>,
+                                        linked_ptr<destruction_tracker, destruction_tracker_base_deleter>>);
 }
 
-TEST(type_test, shared_ptr_assign) {
-  static_assert(std::is_assignable_v<shared_ptr<int>, shared_ptr<int>>);
-  static_assert(std::is_assignable_v<shared_ptr<int>, shared_ptr<int, std::default_delete<int>>>);
-  static_assert(
-      std::is_assignable_v<shared_ptr<int, std::default_delete<int>>, shared_ptr<int, std::default_delete<int>>>);
-  static_assert(!std::is_assignable_v<shared_ptr<int>, shared_ptr<char>>);
-  static_assert(!std::is_assignable_v<shared_ptr<char>, shared_ptr<int>>);
-  // don't look at incorrect dstr for int. Just need type checking
-  static_assert(
-      !std::is_assignable_v<shared_ptr<char, std::default_delete<char>>, shared_ptr<int, std::default_delete<char>>>);
+TEST(trait_tests, shared_ptr_assignment) {
+  static_assert(!std::is_assignable_v<shared_ptr<const int>, shared_ptr<int>>);
+  static_assert(!std::is_assignable_v<shared_ptr<int>, shared_ptr<const int>>);
+  static_assert(!std::is_assignable_v<shared_ptr<int>, shared_ptr<double>>);
+
+  static_assert(!std::is_assignable_v<shared_ptr<destruction_tracker>, shared_ptr<destruction_tracker_base>>);
   static_assert(!std::is_assignable_v<shared_ptr<destruction_tracker_base>, shared_ptr<destruction_tracker>>);
-  static_assert(!std::is_assignable_v<shared_ptr<destruction_tracker_base, unifiedDestructorForBase>,
-                                      shared_ptr<destruction_tracker, unifiedDestructorForBase>>);
+  static_assert(!std::is_assignable_v<shared_ptr<destruction_tracker_base>,
+                                      shared_ptr<destruction_tracker, destruction_tracker_base_deleter>>);
 }
 
-TEST(type_test, linked_ptr_assign) {
-  static_assert(std::is_assignable_v<linked_ptr<int>, linked_ptr<int>>);
-  static_assert(std::is_assignable_v<linked_ptr<int>, linked_ptr<int, std::default_delete<int>>>);
-  static_assert(
-      std::is_assignable_v<linked_ptr<int, std::default_delete<int>>, linked_ptr<int, std::default_delete<int>>>);
-  static_assert(!std::is_assignable_v<linked_ptr<int>, linked_ptr<char>>);
-  static_assert(!std::is_assignable_v<linked_ptr<char>, linked_ptr<int>>);
-  // don't look at incorrect dstr for int. Just need type checking
-  static_assert(
-      std::is_assignable_v<linked_ptr<char, std::default_delete<char>>, linked_ptr<int, std::default_delete<char>>>);
-  static_assert(std::is_assignable_v<linked_ptr<destruction_tracker_base>, linked_ptr<destruction_tracker>>);
+TEST(trait_tests, linked_ptr_assignment) {
+  static_assert(std::is_assignable_v<linked_ptr<const int>, linked_ptr<int>>);
+  static_assert(!std::is_assignable_v<linked_ptr<int>, linked_ptr<const int>>);
+  static_assert(!std::is_assignable_v<linked_ptr<int>, linked_ptr<double>>);
+
   static_assert(!std::is_assignable_v<linked_ptr<destruction_tracker>, linked_ptr<destruction_tracker_base>>);
-  static_assert(std::is_assignable_v<linked_ptr<destruction_tracker_base, unifiedDestructorForBase>,
-                                     linked_ptr<destruction_tracker, unifiedDestructorForBase>>);
+  static_assert(std::is_assignable_v<linked_ptr<destruction_tracker_base>, linked_ptr<destruction_tracker>>);
+  static_assert(std::is_assignable_v<linked_ptr<destruction_tracker_base>,
+                                     linked_ptr<destruction_tracker, destruction_tracker_base_deleter>>);
 }

@@ -191,7 +191,7 @@ class allocation_calls_test : public ::testing::Test {
 protected:
   template <typename T, typename Deleter = std::default_delete<T>>
   using smart_ptr = std::conditional_t<IsShared::value, shared_ptr<T, Deleter>, linked_ptr<T, Deleter>>;
-  using amountOfAllocations = std::integral_constant<int, (IsShared::value ? 1 : 0) + 1>;
+  using amount_of_allocations = std::integral_constant<int, (IsShared::value ? 1 : 0) + 1>;
   test_object::no_new_instances_guard instances_guard;
 };
 
@@ -232,8 +232,8 @@ TYPED_TEST(allocation_calls_test, allocations) {
   }
   const auto new_calls_after = new_calls;
   const auto delete_calls_after = delete_calls;
-  EXPECT_EQ(new_calls_after - new_calls_before, TestFixture::amountOfAllocations::value);
-  EXPECT_EQ(delete_calls_after - delete_calls_before, TestFixture::amountOfAllocations::value);
+  EXPECT_EQ(new_calls_after - new_calls_before, TestFixture::amount_of_allocations::value);
+  EXPECT_EQ(delete_calls_after - delete_calls_before, TestFixture::amount_of_allocations::value);
 }
 
 TYPED_TEST(fault_injection_test, pointer_ctor) {

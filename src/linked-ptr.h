@@ -18,13 +18,13 @@ public:
 
   linked_ptr(const linked_ptr& other) noexcept;
 
-  template <typename Y, typename Del>
-  linked_ptr(const linked_ptr<Y, Del>& other) noexcept;
+  template <typename Y, typename D>
+  linked_ptr(const linked_ptr<Y, D>& other) noexcept;
 
   linked_ptr& operator=(const linked_ptr& other) noexcept;
 
-  template <typename Y, typename Del>
-  linked_ptr& operator=(const linked_ptr<Y, Del>& other) noexcept;
+  template <typename Y, typename D>
+  linked_ptr& operator=(const linked_ptr<Y, D>& other) noexcept;
 
   T* get() const noexcept;
 
