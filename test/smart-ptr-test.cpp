@@ -9,7 +9,7 @@ namespace {
 using destruction_tracker_base_deleter = std::default_delete<destruction_tracker_base>;
 
 template <typename IsShared>
-class common_tests : public ::testing::Test {
+class common_test : public ::testing::Test {
 protected:
   template <typename T, typename Deleter = std::default_delete<T>>
   using smart_ptr = std::conditional_t<IsShared::value, shared_ptr<T, Deleter>, linked_ptr<T, Deleter>>;
@@ -30,17 +30,17 @@ public:
   }
 };
 
-TYPED_TEST_SUITE(common_tests, tested_extents, extent_name_generator);
+TYPED_TEST_SUITE(common_test, tested_extents, extent_name_generator);
 
 } // namespace
 
-TYPED_TEST(common_tests, default_ctor) {
+TYPED_TEST(common_test, default_ctor) {
   typename TestFixture::template smart_ptr<test_object> p;
   EXPECT_EQ(nullptr, p.get());
   EXPECT_FALSE(static_cast<bool>(p));
 }
 
-TYPED_TEST(common_tests, ptr_ctor) {
+TYPED_TEST(common_test, ptr_ctor) {
   test_object* p = new test_object(42);
   typename TestFixture::template smart_ptr<test_object> q(p);
   EXPECT_TRUE(static_cast<bool>(q));
@@ -48,46 +48,46 @@ TYPED_TEST(common_tests, ptr_ctor) {
   EXPECT_EQ(42, *q);
 }
 
-TYPED_TEST(common_tests, ptr_ctor_nullptr) {
+TYPED_TEST(common_test, ptr_ctor_nullptr) {
   typename TestFixture::template smart_ptr<test_object> p(nullptr);
   EXPECT_FALSE(static_cast<bool>(p));
   EXPECT_EQ(0, p.use_count());
 }
 
-TYPED_TEST(common_tests, ptr_ctor_non_empty_nullptr) {
+TYPED_TEST(common_test, ptr_ctor_non_empty_nullptr) {
   typename TestFixture::template smart_ptr<test_object> p(static_cast<test_object*>(nullptr));
   EXPECT_FALSE(static_cast<bool>(p));
   EXPECT_EQ(1, p.use_count());
 }
 
-TYPED_TEST(common_tests, const_dereferencing) {
+TYPED_TEST(common_test, const_dereferencing) {
   const typename TestFixture::template smart_ptr<test_object> p(new test_object(42));
   EXPECT_EQ(42, *p);
   EXPECT_EQ(42, p->operator int());
 }
 
-TYPED_TEST(common_tests, reset) {
+TYPED_TEST(common_test, reset) {
   typename TestFixture::template smart_ptr<test_object> q(new test_object(42));
   EXPECT_TRUE(static_cast<bool>(q));
   q.reset();
   EXPECT_FALSE(static_cast<bool>(q));
 }
 
-TYPED_TEST(common_tests, reset_nullptr) {
+TYPED_TEST(common_test, reset_nullptr) {
   typename TestFixture::template smart_ptr<test_object> q;
   EXPECT_FALSE(static_cast<bool>(q));
   q.reset();
   EXPECT_FALSE(static_cast<bool>(q));
 }
 
-TYPED_TEST(common_tests, reset_ptr) {
+TYPED_TEST(common_test, reset_ptr) {
   typename TestFixture::template smart_ptr<test_object> q(new test_object(42));
   EXPECT_TRUE(static_cast<bool>(q));
   q.reset(new test_object(43));
   EXPECT_EQ(43, *q);
 }
 
-TYPED_TEST(common_tests, copy_ctor) {
+TYPED_TEST(common_test, copy_ctor) {
   typename TestFixture::template smart_ptr<test_object> p(new test_object(42));
   EXPECT_EQ(1, p.use_count());
   typename TestFixture::template smart_ptr<test_object> q = p;
@@ -99,14 +99,14 @@ TYPED_TEST(common_tests, copy_ctor) {
   EXPECT_EQ(2, q.use_count());
 }
 
-TYPED_TEST(common_tests, copy_ctor_nullptr) {
+TYPED_TEST(common_test, copy_ctor_nullptr) {
   typename TestFixture::template smart_ptr<test_object> p;
   typename TestFixture::template smart_ptr<test_object> q = p;
   EXPECT_FALSE(static_cast<bool>(p));
   EXPECT_FALSE(static_cast<bool>(q));
 }
 
-TYPED_TEST(common_tests, copy_assignment_operator) {
+TYPED_TEST(common_test, copy_assignment_operator) {
   typename TestFixture::template smart_ptr<test_object> p(new test_object(42));
   typename TestFixture::template smart_ptr<test_object> q(new test_object(43));
   p = q;
@@ -114,14 +114,14 @@ TYPED_TEST(common_tests, copy_assignment_operator) {
   EXPECT_TRUE(p == q);
 }
 
-TYPED_TEST(common_tests, copy_assignment_operator_from_nullptr) {
+TYPED_TEST(common_test, copy_assignment_operator_from_nullptr) {
   typename TestFixture::template smart_ptr<test_object> p(new test_object(42));
   typename TestFixture::template smart_ptr<test_object> q;
   p = q;
   EXPECT_FALSE(static_cast<bool>(p));
 }
 
-TYPED_TEST(common_tests, copy_assignment_operator_to_nullptr) {
+TYPED_TEST(common_test, copy_assignment_operator_to_nullptr) {
   typename TestFixture::template smart_ptr<test_object> p;
   typename TestFixture::template smart_ptr<test_object> q(new test_object(43));
   p = q;
@@ -129,36 +129,36 @@ TYPED_TEST(common_tests, copy_assignment_operator_to_nullptr) {
   EXPECT_TRUE(p == q);
 }
 
-TYPED_TEST(common_tests, copy_assignment_operator_nullptr) {
+TYPED_TEST(common_test, copy_assignment_operator_nullptr) {
   typename TestFixture::template smart_ptr<test_object> p;
   typename TestFixture::template smart_ptr<test_object> q;
   p = q;
   EXPECT_FALSE(static_cast<bool>(p));
 }
 
-TYPED_TEST(common_tests, copy_assignment_operator_self) {
+TYPED_TEST(common_test, copy_assignment_operator_self) {
   typename TestFixture::template smart_ptr<test_object> p(new test_object(42));
   p = p;
   EXPECT_EQ(42, *p);
 }
 
-TYPED_TEST(common_tests, copy_assignment_operator_self_nullptr) {
+TYPED_TEST(common_test, copy_assignment_operator_self_nullptr) {
   typename TestFixture::template smart_ptr<test_object> p;
   p = p;
   EXPECT_FALSE(static_cast<bool>(p));
 }
 
-TYPED_TEST(common_tests, non_copyable_deleter) {
+TYPED_TEST(common_test, non_copyable_deleter) {
   typename TestFixture::template smart_ptr<test_object, non_copyable_tacker> p(new test_object(42));
 }
 
-TYPED_TEST(common_tests, ptr_ctor_inheritance) {
+TYPED_TEST(common_test, ptr_ctor_inheritance) {
   bool deleted = false;
   { typename TestFixture::template smart_ptr<destruction_tracker_base> p(new destruction_tracker(&deleted)); }
   EXPECT_TRUE(deleted);
 }
 
-TYPED_TEST(common_tests, reset_ptr_inheritance) {
+TYPED_TEST(common_test, reset_ptr_inheritance) {
   bool deleted = false;
   {
     typename TestFixture::template smart_ptr<destruction_tracker_base> p;
@@ -167,7 +167,7 @@ TYPED_TEST(common_tests, reset_ptr_inheritance) {
   EXPECT_TRUE(deleted);
 }
 
-TYPED_TEST(common_tests, custom_deleter) {
+TYPED_TEST(common_test, custom_deleter) {
   bool deleted = false;
   {
     typename TestFixture::template smart_ptr<test_object, tracking_deleter<test_object>> p(
@@ -176,7 +176,7 @@ TYPED_TEST(common_tests, custom_deleter) {
   EXPECT_TRUE(deleted);
 }
 
-TYPED_TEST(common_tests, custom_deleter_reset) {
+TYPED_TEST(common_test, custom_deleter_reset) {
   bool deleted = false;
   {
     typename TestFixture::template smart_ptr<test_object, tracking_deleter<test_object>> p;
@@ -185,13 +185,13 @@ TYPED_TEST(common_tests, custom_deleter_reset) {
   EXPECT_TRUE(deleted);
 }
 
-TEST(linked_ptr_tests, copy_ctor_const) {
+TEST(linked_ptr_test, copy_ctor_const) {
   linked_ptr<test_object, std::default_delete<const test_object>> p(new test_object(42));
   linked_ptr<const test_object> q = p;
   EXPECT_EQ(42, *q);
 }
 
-TEST(linked_ptr_tests, copy_assignment_operator_const) {
+TEST(linked_ptr_test, copy_assignment_operator_const) {
   linked_ptr<test_object, std::default_delete<const test_object>> p(new test_object(42));
   linked_ptr<const test_object> q(new test_object(43));
   q = p;
@@ -199,7 +199,7 @@ TEST(linked_ptr_tests, copy_assignment_operator_const) {
   EXPECT_EQ(42, *p);
 }
 
-TEST(linked_ptr_tests, copy_assignment_operator_const_to_nullptr) {
+TEST(linked_ptr_test, copy_assignment_operator_const_to_nullptr) {
   linked_ptr<test_object, std::default_delete<const test_object>> p(new test_object(42));
   linked_ptr<const test_object> q;
   q = p;
@@ -207,7 +207,7 @@ TEST(linked_ptr_tests, copy_assignment_operator_const_to_nullptr) {
   EXPECT_EQ(42, *p);
 }
 
-TEST(linked_ptr_tests, copy_assignment_operator_const_from_nullptr) {
+TEST(linked_ptr_test, copy_assignment_operator_const_from_nullptr) {
   linked_ptr<test_object, std::default_delete<const test_object>> p;
   linked_ptr<const test_object> q(new test_object(43));
   q = p;
@@ -215,7 +215,7 @@ TEST(linked_ptr_tests, copy_assignment_operator_const_from_nullptr) {
   EXPECT_FALSE(static_cast<bool>(p));
 }
 
-TEST(linked_ptr_tests, copy_ctor_inheritance) {
+TEST(linked_ptr_test, copy_ctor_inheritance) {
   bool deleted = false;
   {
     destruction_tracker* ptr = new destruction_tracker(&deleted);
@@ -230,7 +230,7 @@ TEST(linked_ptr_tests, copy_ctor_inheritance) {
   EXPECT_TRUE(deleted);
 }
 
-TEST(linked_ptr_tests, copy_assignment_operator_inheritance) {
+TEST(linked_ptr_test, copy_assignment_operator_inheritance) {
   bool derived_deleted = false;
   {
     destruction_tracker* ptr = new destruction_tracker(&derived_deleted);
@@ -251,7 +251,7 @@ TEST(linked_ptr_tests, copy_assignment_operator_inheritance) {
   EXPECT_TRUE(derived_deleted);
 }
 
-TYPED_TEST(common_tests, equivalence) {
+TYPED_TEST(common_test, equivalence) {
   typename TestFixture::template smart_ptr<test_object> p1(new test_object(42));
   typename TestFixture::template smart_ptr<test_object> p2(new test_object(43));
   auto p3 = p2;
@@ -263,14 +263,14 @@ TYPED_TEST(common_tests, equivalence) {
   EXPECT_TRUE(p3 == p2);
 }
 
-TYPED_TEST(common_tests, equivalence_self) {
+TYPED_TEST(common_test, equivalence_self) {
   typename TestFixture::template smart_ptr<test_object> p(new test_object(42));
 
   EXPECT_TRUE(p == p);
   EXPECT_FALSE(p != p);
 }
 
-TYPED_TEST(common_tests, equivalence_nullptr) {
+TYPED_TEST(common_test, equivalence_nullptr) {
   typename TestFixture::template smart_ptr<test_object> p;
 
   EXPECT_TRUE(p == nullptr);
@@ -279,7 +279,7 @@ TYPED_TEST(common_tests, equivalence_nullptr) {
   EXPECT_FALSE(nullptr != p);
 }
 
-TYPED_TEST(common_tests, check_lifetime) {
+TYPED_TEST(common_test, check_lifetime) {
   bool deleted = false;
   {
     destruction_tracker* ptr = new destruction_tracker(&deleted);
@@ -297,7 +297,7 @@ TYPED_TEST(common_tests, check_lifetime) {
   EXPECT_TRUE(deleted);
 }
 
-TEST(trait_tests, shared_prt_ctors) {
+TEST(traits_test, shared_prt_ctors) {
   static_assert(std::is_constructible_v<shared_ptr<int>, int*>);
   static_assert(std::is_constructible_v<shared_ptr<int>, int*, std::default_delete<int>>);
   static_assert(!std::is_constructible_v<shared_ptr<int>, double*, std::default_delete<double>>);
@@ -310,7 +310,7 @@ TEST(trait_tests, shared_prt_ctors) {
                                         std::default_delete<destruction_tracker>>);
 }
 
-TEST(trait_tests, linked_prt_ctors) {
+TEST(traits_test, linked_prt_ctors) {
   static_assert(std::is_constructible_v<linked_ptr<int>, int*>);
   static_assert(std::is_constructible_v<linked_ptr<int>, int*, std::default_delete<int>>);
   static_assert(!std::is_constructible_v<linked_ptr<int>, double*, std::default_delete<double>>);
@@ -323,7 +323,7 @@ TEST(trait_tests, linked_prt_ctors) {
                                         std::default_delete<destruction_tracker>>);
 }
 
-TEST(trait_tests, shared_ptr_copy_ctor) {
+TEST(traits_test, shared_ptr_copy_ctor) {
   static_assert(!std::is_constructible_v<shared_ptr<const int>, shared_ptr<int>>);
   static_assert(!std::is_constructible_v<shared_ptr<int>, shared_ptr<const int>>);
   static_assert(!std::is_constructible_v<shared_ptr<int>, shared_ptr<double>>);
@@ -334,7 +334,7 @@ TEST(trait_tests, shared_ptr_copy_ctor) {
                                          shared_ptr<destruction_tracker, destruction_tracker_base_deleter>>);
 }
 
-TEST(trait_tests, linked_ptr_copy_ctor) {
+TEST(traits_test, linked_ptr_copy_ctor) {
   static_assert(std::is_constructible_v<linked_ptr<const int>, linked_ptr<int>>);
   static_assert(!std::is_constructible_v<linked_ptr<int>, linked_ptr<const int>>);
   static_assert(!std::is_constructible_v<linked_ptr<int>, linked_ptr<double>>);
@@ -345,7 +345,7 @@ TEST(trait_tests, linked_ptr_copy_ctor) {
                                         linked_ptr<destruction_tracker, destruction_tracker_base_deleter>>);
 }
 
-TEST(trait_tests, shared_ptr_assignment) {
+TEST(traits_test, shared_ptr_assignment) {
   static_assert(!std::is_assignable_v<shared_ptr<const int>, shared_ptr<int>>);
   static_assert(!std::is_assignable_v<shared_ptr<int>, shared_ptr<const int>>);
   static_assert(!std::is_assignable_v<shared_ptr<int>, shared_ptr<double>>);
@@ -356,7 +356,7 @@ TEST(trait_tests, shared_ptr_assignment) {
                                       shared_ptr<destruction_tracker, destruction_tracker_base_deleter>>);
 }
 
-TEST(trait_tests, linked_ptr_assignment) {
+TEST(traits_test, linked_ptr_assignment) {
   static_assert(std::is_assignable_v<linked_ptr<const int>, linked_ptr<int>>);
   static_assert(!std::is_assignable_v<linked_ptr<int>, linked_ptr<const int>>);
   static_assert(!std::is_assignable_v<linked_ptr<int>, linked_ptr<double>>);
